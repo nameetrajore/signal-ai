@@ -490,12 +490,29 @@ def extract_youtube_id(url: str) -> Optional[str]:
     return None
 
 async def get_youtube_transcript(video_id: str) -> str:
-    """Get YouTube video transcript"""
+    """Get YouTube video transcript with proxy support"""
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
         
-        # New API (v1.x) uses instance methods
-        ytt_api = YouTubeTranscriptApi()
+        # Check if proxy is configured
+        proxy_username = os.environ.get('WEBSHARE_PROXY_USERNAME')
+        proxy_password = os.environ.get('WEBSHARE_PROXY_PASSWORD')
+        
+        if proxy_username and proxy_password:
+            # Use Webshare residential proxy
+            from youtube_transcript_api.proxies import WebshareProxyConfig
+            
+            ytt_api = YouTubeTranscriptApi(
+                proxy_config=WebshareProxyConfig(
+                    proxy_username=proxy_username,
+                    proxy_password=proxy_password
+                )
+            )
+            logger.info(f"Using Webshare proxy for YouTube transcript")
+        else:
+            # Try without proxy (may fail on cloud)
+            ytt_api = YouTubeTranscriptApi()
+        
         transcript = ytt_api.fetch(video_id)
         
         # Handle different response formats
@@ -514,8 +531,8 @@ async def get_youtube_transcript(video_id: str) -> str:
         
         # Check if it's an IP blocking issue
         if 'blocked' in error_msg or 'ip' in error_msg or 'cloud' in error_msg:
-            logger.warning(f"YouTube blocking cloud IP for video {video_id}")
-            raise Exception("YouTube is blocking requests from this server. YouTube transcripts are not available in cloud environments due to IP restrictions.")
+            logger.warning(f"YouTube blocking IP for video {video_id}")
+            raise Exception("YouTube is blocking requests. Configure WEBSHARE_PROXY_USERNAME and WEBSHARE_PROXY_PASSWORD in .env for proxy support.")
         
         logger.error(f"YouTube transcript error: {e}")
         return ""
