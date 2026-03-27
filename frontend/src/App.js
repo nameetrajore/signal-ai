@@ -140,7 +140,7 @@ const Header = () => {
   );
 };
 
-// ============= YouTube URL Detector =============
+// ============= YouTube Transcript Fetcher =============
 const extractYouTubeId = (url) => {
   const patterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
@@ -150,6 +150,46 @@ const extractYouTubeId = (url) => {
     const match = url.match(pattern);
     if (match) return match[1];
   }
+  return null;
+};
+
+const parseTranscriptXml = (xml) => {
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(xml, "text/xml");
+  const textNodes = xmlDoc.getElementsByTagName("text");
+  if (textNodes.length === 0) return null;
+  const parts = [];
+  for (let i = 0; i < textNodes.length; i++) {
+    let text = textNodes[i].textContent || '';
+    text = text
+      .replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>').replace(/\\n/g, ' ').trim();
+    if (text) parts.push(text);
+  }
+  return parts.length > 0 ? parts.join(' ') : null;
+};
+
+const fetchYouTubeTranscript = async (videoId) => {
+  // Try YouTube's timedtext API directly — these endpoints allow cross-origin requests
+  const timedtextVariants = [
+    `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv1`,
+    `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&kind=asr&fmt=srv1`,
+    `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en-US&fmt=srv1`,
+  ];
+
+  for (const url of timedtextVariants) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      const xml = await response.text();
+      const transcript = parseTranscriptXml(xml);
+      if (transcript) return transcript;
+    } catch {
+      continue;
+    }
+  }
+
   return null;
 };
 
@@ -171,13 +211,20 @@ const CheckThis = () => {
     setLoadingStatus("Analyzing...");
 
     try {
+      let transcript = null;
       const youtubeId = extractYouTubeId(url);
+
       if (youtubeId) {
         setLoadingStatus("Fetching YouTube transcript...");
+        transcript = await fetchYouTubeTranscript(youtubeId);
+        if (transcript) setLoadingStatus("Analyzing content...");
       }
 
-      // Send to backend for analysis — backend handles transcript fetching server-side
-      const response = await axios.post(`${API}/check-url`, { url });
+      // Send to backend — pass transcript if fetched client-side to avoid cloud IP blocks
+      const response = await axios.post(`${API}/check-url`, {
+        url,
+        transcript: transcript || undefined,
+      });
       
       setResult(response.data);
       toast.success("Analysis complete!");
