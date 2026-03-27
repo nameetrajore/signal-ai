@@ -188,6 +188,56 @@ class SignalAITester:
         
         self.run_test("Trigger News Ingestion", "POST", "ingest", 200)
 
+    def test_subscription_endpoints(self):
+        """Test email subscription endpoints"""
+        print("\n" + "=" * 50)
+        print("TESTING SUBSCRIPTION ENDPOINTS")
+        print("=" * 50)
+        
+        # Test subscribe endpoint
+        test_email = f"test_{datetime.now().strftime('%H%M%S')}@example.com"
+        success, response = self.run_test("Subscribe to Digest", "POST", "subscribe", 200, 
+                                        data={"email": test_email})
+        
+        # Test duplicate subscription
+        self.run_test("Duplicate Subscription", "POST", "subscribe", 200, 
+                     data={"email": test_email})
+        
+        # Test invalid email
+        self.run_test("Invalid Email Subscription", "POST", "subscribe", 422, 
+                     data={"email": "invalid-email"})
+        
+        # Test unsubscribe
+        self.run_test("Unsubscribe", "POST", "unsubscribe", 200, 
+                     data={"email": test_email})
+        
+        # Test subscriber count
+        self.run_test("Get Subscriber Count", "GET", "subscribers/count", 200)
+
+    def test_blindspots_endpoint(self):
+        """Test blindspots endpoint"""
+        print("\n" + "=" * 50)
+        print("TESTING BLINDSPOTS ENDPOINT")
+        print("=" * 50)
+        
+        self.run_test("Get Blindspots", "GET", "blindspots", 200)
+
+    def test_clustering_endpoint(self):
+        """Test clustering endpoint"""
+        print("\n" + "=" * 50)
+        print("TESTING CLUSTERING ENDPOINT")
+        print("=" * 50)
+        
+        self.run_test("Trigger Clustering", "POST", "cluster", 200)
+
+    def test_digest_email_endpoint(self):
+        """Test digest email endpoint"""
+        print("\n" + "=" * 50)
+        print("TESTING DIGEST EMAIL ENDPOINT")
+        print("=" * 50)
+        
+        self.run_test("Trigger Digest Email", "POST", "send-digest", 200)
+
     def print_summary(self):
         """Print test summary"""
         print("\n" + "=" * 60)
@@ -220,6 +270,10 @@ def main():
     tester.test_digest_endpoint()
     tester.test_check_url_endpoint()
     tester.test_ingestion_endpoint()
+    tester.test_subscription_endpoints()
+    tester.test_blindspots_endpoint()
+    tester.test_clustering_endpoint()
+    tester.test_digest_email_endpoint()
     
     # Print summary and return exit code
     success = tester.print_summary()
