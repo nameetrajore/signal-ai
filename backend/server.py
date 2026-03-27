@@ -493,20 +493,30 @@ async def get_youtube_transcript(video_id: str) -> str:
     """Get YouTube video transcript"""
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
-        # New API uses fetch method
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-        return " ".join([t['text'] for t in transcript_list])
-    except AttributeError:
-        # Try alternative method for newer versions
-        try:
-            from youtube_transcript_api import YouTubeTranscriptApi
-            ytt_api = YouTubeTranscriptApi()
-            transcript = ytt_api.fetch(video_id)
-            return " ".join([t.text for t in transcript])
-        except Exception as e:
-            logger.error(f"YouTube transcript fallback error: {e}")
-            return ""
+        
+        # New API (v1.x) uses instance methods
+        ytt_api = YouTubeTranscriptApi()
+        transcript = ytt_api.fetch(video_id)
+        
+        # Handle different response formats
+        if hasattr(transcript, '__iter__'):
+            text_parts = []
+            for segment in transcript:
+                if hasattr(segment, 'text'):
+                    text_parts.append(segment.text)
+                elif isinstance(segment, dict):
+                    text_parts.append(segment.get('text', ''))
+            return " ".join(text_parts)
+        return str(transcript)
+        
     except Exception as e:
+        error_msg = str(e).lower()
+        
+        # Check if it's an IP blocking issue
+        if 'blocked' in error_msg or 'ip' in error_msg or 'cloud' in error_msg:
+            logger.warning(f"YouTube blocking cloud IP for video {video_id}")
+            raise Exception("YouTube is blocking requests from this server. YouTube transcripts are not available in cloud environments due to IP restrictions.")
+        
         logger.error(f"YouTube transcript error: {e}")
         return ""
 
@@ -1084,9 +1094,18 @@ async def check_url(request: CheckUrlRequest):
     
     if youtube_id:
         # YouTube video
-        text = await get_youtube_transcript(youtube_id)
-        if not text:
-            raise HTTPException(status_code=400, detail="Could not extract YouTube transcript. The video may not have captions or may be private.")
+        try:
+            text = await get_youtube_transcript(youtube_id)
+            if not text:
+                raise HTTPException(status_code=400, detail="Could not extract YouTube transcript. The video may not have captions or may be private.")
+        except Exception as e:
+            error_msg = str(e)
+            if "blocking" in error_msg.lower() or "cloud" in error_msg.lower():
+                raise HTTPException(
+                    status_code=503, 
+                    detail="YouTube is blocking transcript requests from cloud servers. This is a known limitation. Try analyzing an article URL instead."
+                )
+            raise HTTPException(status_code=400, detail=f"YouTube transcript error: {error_msg}")
         title = f"YouTube Video: {youtube_id}"
         source_type = "youtube"
     else:
