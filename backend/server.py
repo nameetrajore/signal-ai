@@ -140,6 +140,78 @@ class BlindspotStory(BaseModel):
     coverage_ratio: float
     sample_article: Optional[Dict[str, Any]] = None
 
+# ============= AI Relevance Scoring =============
+
+AI_KEYWORDS = {
+    # Core AI terms (high weight)
+    'artificial intelligence': 3, 'machine learning': 3, 'deep learning': 3,
+    'neural network': 3, 'neural networks': 3, 'large language model': 3,
+    'llm': 3, 'llms': 3, 'gpt': 3, 'chatgpt': 3, 'openai': 3, 'anthropic': 3,
+    'claude': 3, 'gemini': 3, 'copilot': 3, 'midjourney': 3, 'stable diffusion': 3,
+    'dall-e': 3, 'sora': 3, 'transformer': 3, 'transformers': 3,
+    
+    # AI concepts (medium weight)
+    'natural language processing': 2, 'nlp': 2, 'computer vision': 2,
+    'generative ai': 2, 'gen ai': 2, 'genai': 2, 'foundation model': 2,
+    'reinforcement learning': 2, 'supervised learning': 2, 'unsupervised learning': 2,
+    'training data': 2, 'fine-tuning': 2, 'fine tuning': 2, 'prompt engineering': 2,
+    'embedding': 2, 'embeddings': 2, 'vector database': 2, 'rag': 2,
+    'retrieval augmented': 2, 'multimodal': 2, 'diffusion model': 2,
+    'language model': 2, 'chatbot': 2, 'ai model': 2, 'ai models': 2,
+    'ai system': 2, 'ai systems': 2, 'ai agent': 2, 'ai agents': 2,
+    'autonomous ai': 2, 'agi': 2, 'artificial general intelligence': 2,
+    
+    # AI companies/labs (medium weight)
+    'deepmind': 2, 'meta ai': 2, 'google ai': 2, 'microsoft ai': 2,
+    'nvidia ai': 2, 'hugging face': 2, 'huggingface': 2, 'cohere': 2,
+    'mistral': 2, 'stability ai': 2, 'inflection': 2, 'xai': 2,
+    'perplexity': 2, 'character ai': 2, 'runway': 2, 'replicate': 2,
+    
+    # AI-related terms (low weight)
+    'ai': 1, 'ml': 1, 'algorithm': 1, 'algorithms': 1, 'automation': 1,
+    'robotics': 1, 'robot': 1, 'robots': 1, 'inference': 1, 'prediction': 1,
+    'classification': 1, 'regression': 1, 'clustering': 1, 'dataset': 1,
+    'datasets': 1, 'benchmark': 1, 'gpu': 1, 'gpus': 1, 'tensor': 1,
+    'pytorch': 1, 'tensorflow': 1, 'model': 1, 'parameters': 1,
+    'tokens': 1, 'tokenizer': 1, 'context window': 1, 'hallucination': 1,
+    'bias': 1, 'alignment': 1, 'safety': 1, 'ethics': 1,
+}
+
+# Minimum score to be considered AI-related
+AI_RELEVANCE_THRESHOLD = 6
+
+def calculate_ai_relevance_score(text: str, title: str = "") -> int:
+    """
+    Calculate AI relevance score for an article.
+    Returns score based on presence of AI-related keywords.
+    Higher score = more AI-related.
+    """
+    combined_text = f"{title} {title} {text}".lower()  # Title weighted 2x
+    score = 0
+    matched_keywords = []
+    
+    for keyword, weight in AI_KEYWORDS.items():
+        # Count occurrences (with word boundaries for short terms)
+        if len(keyword) <= 3:
+            # For short terms like 'ai', 'ml', 'llm', use word boundaries
+            pattern = r'\b' + re.escape(keyword) + r'\b'
+            count = len(re.findall(pattern, combined_text))
+        else:
+            count = combined_text.count(keyword)
+        
+        if count > 0:
+            # Diminishing returns for repeated keywords
+            keyword_score = weight * min(count, 3)
+            score += keyword_score
+            matched_keywords.append(keyword)
+    
+    return score
+
+def is_ai_related(text: str, title: str = "") -> bool:
+    """Check if article is AI-related based on keyword scoring"""
+    score = calculate_ai_relevance_score(text, title)
+    return score >= AI_RELEVANCE_THRESHOLD
+
 # ============= TF-IDF Clustering =============
 
 STOP_WORDS = {
@@ -589,8 +661,15 @@ async def process_and_store_article(article_data: Dict[str, Any]) -> Optional[st
     # Extract full content
     content = await extract_article_content(url)
     text = content.get("text", article_data.get("description", ""))
+    title = article_data.get("title", content.get("title", ""))
     
     if not text or len(text) < 50:
+        return None
+    
+    # Check AI relevance - skip non-AI articles
+    ai_score = calculate_ai_relevance_score(text, title)
+    if ai_score < AI_RELEVANCE_THRESHOLD:
+        logger.info(f"Skipping non-AI article (score {ai_score}): {title[:50]}")
         return None
     
     # Score and summarize
@@ -598,15 +677,15 @@ async def process_and_store_article(article_data: Dict[str, Any]) -> Optional[st
     summary = await summarize_article(text)
     
     # Extract keywords for clustering
-    keywords = extract_keywords(f"{article_data.get('title', '')} {text}")
+    keywords = extract_keywords(f"{title} {text}")
     
     # Extract predictions
-    predictions = await extract_predictions(text, url, article_data.get("title", ""))
+    predictions = await extract_predictions(text, url, title)
     
     # Store article
     article = Article(
         url=url,
-        title=article_data.get("title", content.get("title", "Unknown")),
+        title=title or "Unknown",
         source_name=article_data.get("source", {}).get("name", "Unknown"),
         published_at=article_data.get("publishedAt", datetime.now(timezone.utc).isoformat()),
         raw_text=text[:5000],
@@ -1139,6 +1218,55 @@ async def trigger_digest(background_tasks: BackgroundTasks):
     """Manually trigger sending daily digest"""
     background_tasks.add_task(send_daily_digest_to_all)
     return {"message": "Digest sending started"}
+
+@api_router.post("/cleanup-non-ai")
+async def cleanup_non_ai_articles():
+    """Remove non-AI related articles from database"""
+    logger.info("Starting cleanup of non-AI articles...")
+    
+    # Get all articles
+    articles = await db.articles.find({}, {"_id": 0}).to_list(1000)
+    
+    removed_count = 0
+    removed_titles = []
+    kept_count = 0
+    
+    for article in articles:
+        title = article.get("title", "")
+        text = article.get("raw_text", "") or article.get("summary", "")
+        
+        ai_score = calculate_ai_relevance_score(text, title)
+        
+        if ai_score < AI_RELEVANCE_THRESHOLD:
+            # Remove article
+            await db.articles.delete_one({"id": article["id"]})
+            
+            # Remove from clusters
+            await db.clusters.update_many(
+                {},
+                {"$pull": {"article_ids": article["id"]}}
+            )
+            
+            # Remove associated predictions
+            await db.predictions.delete_many({"article_id": article["id"]})
+            
+            removed_count += 1
+            removed_titles.append(f"{title[:50]}... (score: {ai_score})")
+        else:
+            kept_count += 1
+    
+    # Clean up empty clusters
+    empty_clusters = await db.clusters.delete_many({"article_ids": {"$size": 0}})
+    
+    logger.info(f"Cleanup complete: removed {removed_count} articles, kept {kept_count}")
+    
+    return {
+        "message": "Cleanup complete",
+        "removed_count": removed_count,
+        "kept_count": kept_count,
+        "removed_articles": removed_titles[:20],  # Show first 20
+        "empty_clusters_removed": empty_clusters.deleted_count
+    }
 
 @api_router.get("/stats")
 async def get_stats():
