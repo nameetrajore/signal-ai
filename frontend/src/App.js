@@ -2,7 +2,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Link, useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { Search, TrendingUp, Skull, FileText, Menu, X, ExternalLink, Check, AlertTriangle, ChevronRight, Loader2, Clock, ArrowRight, Link as LinkIcon } from "lucide-react";
+import { Search, TrendingUp, Skull, FileText, Menu, X, ExternalLink, Check, AlertTriangle, ChevronRight, Loader2, Clock, ArrowRight, Link as LinkIcon, Mail, Eye, EyeOff, Layers, Users } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
@@ -65,16 +65,28 @@ const Header = () => {
                 Feed
               </Button>
             </Link>
+            <Link to="/clusters" data-testid="nav-clusters">
+              <Button variant="ghost" className="text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100">
+                <Layers className="w-4 h-4 mr-1.5" />
+                Stories
+              </Button>
+            </Link>
+            <Link to="/blindspots" data-testid="nav-blindspots">
+              <Button variant="ghost" className="text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100">
+                <EyeOff className="w-4 h-4 mr-1.5" />
+                Blindspots
+              </Button>
+            </Link>
             <Link to="/predictions" data-testid="nav-predictions">
               <Button variant="ghost" className="text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100">
                 <Skull className="w-4 h-4 mr-1.5" />
-                Prediction Graveyard
+                Graveyard
               </Button>
             </Link>
             <Link to="/digest" data-testid="nav-digest">
               <Button variant="ghost" className="text-zinc-600 hover:text-zinc-950 hover:bg-zinc-100">
                 <FileText className="w-4 h-4 mr-1.5" />
-                Daily Digest
+                Digest
               </Button>
             </Link>
           </nav>
@@ -93,19 +105,31 @@ const Header = () => {
         {mobileMenuOpen && (
           <nav className="md:hidden py-4 border-t border-zinc-200">
             <div className="flex flex-col gap-2">
-              <Link to="/" onClick={() => setMobileMenuOpen(false)} data-testid="mobile-nav-feed">
+              <Link to="/" onClick={() => setMobileMenuOpen(false)}>
                 <Button variant="ghost" className="w-full justify-start">Feed</Button>
               </Link>
-              <Link to="/predictions" onClick={() => setMobileMenuOpen(false)} data-testid="mobile-nav-predictions">
+              <Link to="/clusters" onClick={() => setMobileMenuOpen(false)}>
                 <Button variant="ghost" className="w-full justify-start">
-                  <Skull className="w-4 h-4 mr-2" />
-                  Prediction Graveyard
+                  <Layers className="w-4 h-4 mr-2" />
+                  Stories
                 </Button>
               </Link>
-              <Link to="/digest" onClick={() => setMobileMenuOpen(false)} data-testid="mobile-nav-digest">
+              <Link to="/blindspots" onClick={() => setMobileMenuOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start">
+                  <EyeOff className="w-4 h-4 mr-2" />
+                  Blindspots
+                </Button>
+              </Link>
+              <Link to="/predictions" onClick={() => setMobileMenuOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start">
+                  <Skull className="w-4 h-4 mr-2" />
+                  Graveyard
+                </Button>
+              </Link>
+              <Link to="/digest" onClick={() => setMobileMenuOpen(false)}>
                 <Button variant="ghost" className="w-full justify-start">
                   <FileText className="w-4 h-4 mr-2" />
-                  Daily Digest
+                  Digest
                 </Button>
               </Link>
             </div>
@@ -422,8 +446,9 @@ const FeedPage = () => {
           </div>
 
           {/* Sidebar */}
-          <aside className="w-full lg:w-80 flex-shrink-0">
-            <div className="bg-white border border-zinc-200 rounded-sm overflow-hidden sticky top-24">
+          <aside className="w-full lg:w-80 flex-shrink-0 space-y-6">
+            {/* Stats */}
+            <div className="bg-white border border-zinc-200 rounded-sm overflow-hidden">
               <div className="p-4 border-b border-zinc-200">
                 <h3 className="font-bold text-sm uppercase tracking-wider text-zinc-500">Stats</h3>
               </div>
@@ -435,8 +460,16 @@ const FeedPage = () => {
                     <span className="font-bold text-zinc-950">{stats.articles}</span>
                   </div>
                   <div className="flex justify-between items-center">
+                    <span className="text-sm text-zinc-600">Story Clusters</span>
+                    <span className="font-bold text-zinc-950">{stats.clusters}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
                     <span className="text-sm text-zinc-600">Predictions Tracked</span>
                     <span className="font-bold text-zinc-950">{stats.predictions}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-zinc-600">Subscribers</span>
+                    <span className="font-bold text-zinc-950">{stats.subscribers || 0}</span>
                   </div>
                   <Separator />
                   <div>
@@ -475,8 +508,316 @@ const FeedPage = () => {
                 </Button>
               </div>
             </div>
+
+            {/* Email Subscribe */}
+            <EmailSubscribe />
           </aside>
         </div>
+      </main>
+    </div>
+  );
+};
+
+// ============= Email Subscribe Component =============
+const EmailSubscribe = () => {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubscribe = async (e) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API}/subscribe`, { email });
+      toast.success(response.data.message);
+      setEmail("");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to subscribe");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-zinc-950 text-white rounded-sm overflow-hidden p-6">
+      <div className="flex items-center gap-2 mb-3">
+        <Mail className="w-5 h-5" />
+        <h3 className="font-bold">Daily Digest</h3>
+      </div>
+      <p className="text-sm text-zinc-400 mb-4">
+        Get the top low-hype AI stories delivered to your inbox every morning.
+      </p>
+      <form onSubmit={handleSubscribe} className="space-y-3">
+        <Input
+          type="email"
+          placeholder="your@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+          data-testid="subscribe-email-input"
+        />
+        <Button 
+          type="submit" 
+          disabled={loading}
+          className="w-full bg-white text-zinc-950 hover:bg-zinc-100"
+          data-testid="subscribe-button"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe"}
+        </Button>
+      </form>
+    </div>
+  );
+};
+
+// ============= Clusters Page =============
+const ClustersPage = () => {
+  const [clusters, setClusters] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchClusters();
+  }, []);
+
+  const fetchClusters = async () => {
+    try {
+      const response = await axios.get(`${API}/clusters`);
+      setClusters(response.data);
+    } catch (error) {
+      console.error("Error fetching clusters:", error);
+      toast.error("Failed to load story clusters");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const triggerClustering = async () => {
+    try {
+      await axios.post(`${API}/cluster`);
+      toast.success("Clustering started! Check back in a moment.");
+    } catch (error) {
+      toast.error("Failed to start clustering");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-zinc-50">
+      <Header />
+      
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <Layers className="w-8 h-8 text-zinc-950" />
+              <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-zinc-950">
+                Story Clusters
+              </h1>
+            </div>
+            <p className="text-zinc-500">
+              Same story, multiple perspectives. See how different sources cover the same event.
+            </p>
+          </div>
+          <Button onClick={triggerClustering} variant="outline" data-testid="cluster-button">
+            <Layers className="w-4 h-4 mr-2" />
+            Re-cluster
+          </Button>
+        </div>
+
+        {loading ? (
+          <div className="p-12 text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-zinc-400" />
+          </div>
+        ) : clusters.length === 0 ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Layers className="w-12 h-12 mx-auto text-zinc-300 mb-4" />
+              <h3 className="font-bold text-lg text-zinc-950 mb-2">No clusters yet</h3>
+              <p className="text-zinc-500 mb-4">
+                Clusters are created when multiple articles cover the same story
+              </p>
+              <Button onClick={triggerClustering}>Create Clusters</Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6" data-testid="clusters-list">
+            {clusters.map((cluster) => (
+              <Card key={cluster.id} className="overflow-hidden" data-testid={`cluster-${cluster.id}`}>
+                <CardHeader className="border-b border-zinc-200 bg-zinc-50">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-xl">{cluster.label}</CardTitle>
+                      <p className="text-sm text-zinc-500 mt-1">
+                        {cluster.article_count} sources covering this story
+                      </p>
+                    </div>
+                    <Badge variant="outline">{cluster.article_count} articles</Badge>
+                  </div>
+                  {cluster.keywords?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-3">
+                      {cluster.keywords.slice(0, 5).map((kw, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs">{kw}</Badge>
+                      ))}
+                    </div>
+                  )}
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 divide-x divide-zinc-200">
+                    {cluster.articles?.slice(0, 3).map((article) => (
+                      <div key={article.id} className="p-4 hover:bg-zinc-50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-medium text-zinc-500 uppercase">
+                            {article.source_name}
+                          </span>
+                          {article.hype_score && <HypeBadge score={article.hype_score} />}
+                        </div>
+                        <h4 className="font-medium text-sm mb-2 line-clamp-2">
+                          <a 
+                            href={article.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="hover:text-blue-600"
+                          >
+                            {article.title}
+                          </a>
+                        </h4>
+                        {article.summary && (
+                          <p className="text-xs text-zinc-500 line-clamp-2">{article.summary}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+// ============= Blindspots Page =============
+const BlindspotsPage = () => {
+  const [blindspots, setBlindspots] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchBlindspots();
+  }, []);
+
+  const fetchBlindspots = async () => {
+    try {
+      const response = await axios.get(`${API}/blindspots`);
+      setBlindspots(response.data.blindspots || []);
+    } catch (error) {
+      console.error("Error fetching blindspots:", error);
+      toast.error("Failed to load blindspots");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-zinc-50">
+      <Header />
+      
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <EyeOff className="w-8 h-8 text-zinc-950" />
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-zinc-950">
+              Blindspots
+            </h1>
+          </div>
+          <p className="text-zinc-500">
+            Stories that major AI news sources are not covering. What are they missing?
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="p-12 text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto text-zinc-400" />
+          </div>
+        ) : blindspots.length === 0 ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Eye className="w-12 h-12 mx-auto text-zinc-300 mb-4" />
+              <h3 className="font-bold text-lg text-zinc-950 mb-2">No blindspots detected</h3>
+              <p className="text-zinc-500">
+                All major stories are being covered by multiple sources
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4" data-testid="blindspots-list">
+            {blindspots.map((blindspot) => (
+              <Card key={blindspot.cluster_id} className="overflow-hidden" data-testid={`blindspot-${blindspot.cluster_id}`}>
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-bold text-lg text-zinc-950">{blindspot.label}</h3>
+                      <p className="text-sm text-zinc-500 mt-1">
+                        Only {Math.round(blindspot.coverage_ratio * 100)}% coverage from major sources
+                      </p>
+                    </div>
+                    <Badge 
+                      variant="outline" 
+                      className="bg-amber-50 text-amber-800 border-amber-300"
+                    >
+                      {blindspot.covering_sources.length} / {blindspot.total_sources} sources
+                    </Badge>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">
+                        Covering ({blindspot.covering_sources.length})
+                      </h4>
+                      <div className="flex flex-wrap gap-1">
+                        {blindspot.covering_sources.map((source, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs bg-emerald-50 text-emerald-700">
+                            {source}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-red-600 mb-2">
+                        Not Covering ({blindspot.missing_sources.length})
+                      </h4>
+                      <div className="flex flex-wrap gap-1">
+                        {blindspot.missing_sources.slice(0, 8).map((source, i) => (
+                          <Badge key={i} variant="outline" className="text-xs text-zinc-500">
+                            {source}
+                          </Badge>
+                        ))}
+                        {blindspot.missing_sources.length > 8 && (
+                          <Badge variant="outline" className="text-xs text-zinc-400">
+                            +{blindspot.missing_sources.length - 8} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {blindspot.sample_article && (
+                    <div className="mt-4 pt-4 border-t border-zinc-200">
+                      <a 
+                        href={blindspot.sample_article.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:underline flex items-center"
+                      >
+                        Read story from {blindspot.sample_article.source_name}
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </a>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
@@ -662,6 +1003,15 @@ const DigestPage = () => {
           </p>
         </div>
 
+        {/* Subscribe CTA */}
+        <div className="mb-12 p-6 bg-zinc-950 text-white rounded-sm text-center">
+          <h3 className="font-bold text-lg mb-2">Get this in your inbox</h3>
+          <p className="text-zinc-400 text-sm mb-4">Subscribe to receive the daily digest every morning at 8 AM UTC.</p>
+          <div className="max-w-sm mx-auto">
+            <EmailSubscribeInline />
+          </div>
+        </div>
+
         {loading ? (
           <div className="p-12 text-center">
             <Loader2 className="w-8 h-8 animate-spin mx-auto text-zinc-400" />
@@ -720,6 +1070,47 @@ const DigestPage = () => {
   );
 };
 
+// ============= Inline Email Subscribe =============
+const EmailSubscribeInline = () => {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubscribe = async (e) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API}/subscribe`, { email });
+      toast.success(response.data.message);
+      setEmail("");
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to subscribe");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubscribe} className="flex gap-2">
+      <Input
+        type="email"
+        placeholder="your@email.com"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500 flex-1"
+      />
+      <Button 
+        type="submit" 
+        disabled={loading}
+        className="bg-white text-zinc-950 hover:bg-zinc-100"
+      >
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe"}
+      </Button>
+    </form>
+  );
+};
+
 // ============= Home Page Wrapper =============
 const HomePage = () => {
   return (
@@ -737,6 +1128,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/clusters" element={<ClustersPage />} />
+          <Route path="/blindspots" element={<BlindspotsPage />} />
           <Route path="/predictions" element={<PredictionsPage />} />
           <Route path="/digest" element={<DigestPage />} />
         </Routes>
