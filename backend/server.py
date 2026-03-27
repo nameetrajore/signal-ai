@@ -240,27 +240,93 @@ async def get_youtube_transcript(video_id: str) -> str:
     """Get YouTube video transcript"""
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
+        # New API uses fetch method
         transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
         return " ".join([t['text'] for t in transcript_list])
+    except AttributeError:
+        # Try alternative method for newer versions
+        try:
+            from youtube_transcript_api import YouTubeTranscriptApi
+            ytt_api = YouTubeTranscriptApi()
+            transcript = ytt_api.fetch(video_id)
+            return " ".join([t.text for t in transcript])
+        except Exception as e:
+            logger.error(f"YouTube transcript fallback error: {e}")
+            return ""
     except Exception as e:
         logger.error(f"YouTube transcript error: {e}")
         return ""
 
 async def extract_article_content(url: str) -> Dict[str, Any]:
-    """Extract article content using newspaper3k"""
+    """Extract article content using newspaper3k with fallback to requests"""
+    import requests
+    from bs4 import BeautifulSoup
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+    }
+    
+    # First try requests + BeautifulSoup (most reliable)
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Remove scripts, styles, and other non-content elements
+        for element in soup(['script', 'style', 'nav', 'footer', 'header', 'aside', 'noscript']):
+            element.decompose()
+        
+        # Extract title
+        title = ""
+        if soup.title:
+            title = soup.title.get_text(strip=True)
+        elif soup.find('h1'):
+            title = soup.find('h1').get_text(strip=True)
+        
+        # Try to find article content
+        article_content = soup.find('article')
+        if article_content:
+            text_parts = []
+            for p in article_content.find_all('p'):
+                text = p.get_text(strip=True)
+                if len(text) > 30:
+                    text_parts.append(text)
+            if text_parts:
+                return {"title": title or "Article", "text": " ".join(text_parts), "source": url}
+        
+        # Fallback: get all paragraphs
+        text_parts = []
+        for p in soup.find_all('p'):
+            text = p.get_text(strip=True)
+            if len(text) > 30:
+                text_parts.append(text)
+        
+        if text_parts:
+            return {"title": title or "Article", "text": " ".join(text_parts), "source": url}
+        
+    except Exception as e:
+        logger.error(f"BeautifulSoup extraction error: {e}")
+    
+    # Fallback to newspaper3k
     try:
         from newspaper import Article as NewsArticle
         article = NewsArticle(url)
         article.download()
         article.parse()
-        return {
-            "title": article.title or "Unknown Title",
-            "text": article.text or "",
-            "source": article.source_url or url
-        }
+        
+        if article.text and len(article.text) > 50:
+            return {
+                "title": article.title or "Unknown Title",
+                "text": article.text,
+                "source": article.source_url or url
+            }
     except Exception as e:
-        logger.error(f"Article extraction error: {e}")
-        return {"title": "Unknown Title", "text": "", "source": url}
+        logger.error(f"Newspaper3k extraction error: {e}")
+    
+    return {"title": "Unknown Title", "text": "", "source": url}
 
 # ============= News Ingestion =============
 
@@ -508,6 +574,13 @@ async def check_url(request: CheckUrlRequest):
     """Check any URL for hype, claims, and predictions"""
     url = request.url.strip()
     
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+    
+    # Validate URL format
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+    
     # Determine source type
     youtube_id = extract_youtube_id(url)
     
@@ -515,7 +588,7 @@ async def check_url(request: CheckUrlRequest):
         # YouTube video
         text = await get_youtube_transcript(youtube_id)
         if not text:
-            raise HTTPException(status_code=400, detail="Could not extract YouTube transcript")
+            raise HTTPException(status_code=400, detail="Could not extract YouTube transcript. The video may not have captions or may be private.")
         title = f"YouTube Video: {youtube_id}"
         source_type = "youtube"
     else:
@@ -525,8 +598,8 @@ async def check_url(request: CheckUrlRequest):
         title = content.get("title", "Unknown Title")
         source_type = "article"
         
-        if not text:
-            raise HTTPException(status_code=400, detail="Could not extract article content")
+        if not text or len(text) < 50:
+            raise HTTPException(status_code=400, detail="Could not extract enough content from this URL. The page may be blocked, require login, or have no readable text.")
     
     # Analyze content
     hype_result = await score_hype(text)
