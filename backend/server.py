@@ -365,24 +365,24 @@ async def cluster_articles(similarity_threshold: float = 0.3):
 # ============= LLM Service =============
 
 async def call_claude(prompt: str, system_message: str = "You are a helpful AI assistant.") -> str:
-    """Call Claude API using emergentintegrations"""
+    """Call Claude API using litellm"""
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        import litellm
+
+        api_key = os.environ.get('ANTHROPIC_API_KEY', os.environ.get('EMERGENT_LLM_KEY', ''))
         if not api_key:
-            logger.error("EMERGENT_LLM_KEY not found")
+            logger.error("No API key found (ANTHROPIC_API_KEY or EMERGENT_LLM_KEY)")
             return ""
-        
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=str(uuid.uuid4()),
-            system_message=system_message
-        ).with_model("anthropic", "claude-sonnet-4-5-20250929")
-        
-        user_message = UserMessage(text=prompt)
-        response = await chat.send_message(user_message)
-        return response
+
+        response = await litellm.acompletion(
+            model="anthropic/claude-sonnet-4-5-20250929",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": prompt}
+            ],
+            api_key=api_key
+        )
+        return response.choices[0].message.content or ""
     except Exception as e:
         logger.error(f"Claude API error: {e}")
         return ""
