@@ -1,0 +1,103 @@
+{
+  "project_name": "SignalAI",
+  "theme": "light",
+  "archetype": "4 (Swiss & High-Contrast)",
+  "core_philosophy": "Authority, clarity, and truth. 95% of UI is monochrome. Color exists exclusively to signal Hype Scores (1-5) and primary actions. Content should feel like a high-end financial or journalistic terminal.",
+  "color_palette": {
+    "background": "#FAFAFA",
+    "surface": "#FFFFFF",
+    "surface_muted": "#F4F4F5",
+    "border": "#E4E4E7",
+    "border_strong": "#18181B",
+    "text_primary": "#09090B",
+    "text_secondary": "#52525B",
+    "brand_accent": "#002FA7",
+    "hype_scores": {
+      "score_1_2": {
+        "bg": "#DCFCE7",
+        "text": "#166534",
+        "border": "#22C55E",
+        "label": "Green (1-2) - Primary Source / Grounded"
+      },
+      "score_3": {
+        "bg": "#FEF9C3",
+        "text": "#854D0E",
+        "border": "#EAB308",
+        "label": "Yellow (3) - Opinion / Analysis"
+      },
+      "score_4_5": {
+        "bg": "#FEE2E2",
+        "text": "#991B1B",
+        "border": "#EF4444",
+        "label": "Red (4-5) - Speculation / Fear mongering"
+      }
+    }
+  },
+  "typography": {
+    "strategy": "The 'Swiss Brutalist'. Heavy, black headings paired with sterile, highly legible body text.",
+    "fonts": {
+      "headings": "Cabinet Grotesk, sans-serif",
+      "body": "IBM Plex Sans, sans-serif",
+      "mono": "IBM Plex Mono, monospace"
+    },
+    "scales": {
+      "h1": "text-5xl md:text-6xl font-black tracking-tighter leading-none text-zinc-950",
+      "h2": "text-3xl md:text-4xl font-bold tracking-tight leading-tight text-zinc-900",
+      "h3": "text-xl md:text-2xl font-bold tracking-tight text-zinc-900",
+      "body": "text-base md:text-lg leading-relaxed text-zinc-800",
+      "small": "text-sm text-zinc-500",
+      "overline": "text-xs font-bold uppercase tracking-[0.2em] text-zinc-500"
+    }
+  },
+  "spacing_and_layout": {
+    "global_padding": "p-6 md:p-12 lg:p-24",
+    "container": "max-w-7xl mx-auto",
+    "grid_system": "The 'Control Room' Grid (Mode B). grid-cols-1 md:grid-cols-3 lg:grid-cols-4 with gap-6. Every pixel utilized.",
+    "component_padding": "p-6 lg:p-8 for cards and containers to prevent text collision"
+  },
+  "surface_styles": {
+    "global": "Grid Borders (The 'Technical' Look). Expose the skeleton. Heavy use of border-b and border-r.",
+    "cards": "Flat solid background, 1px solid border-zinc-200, NO soft shadows. Sharp corners or max rounded-sm (2px). Hover state: border-zinc-900.",
+    "header": "Solid white background with a hard 1px bottom border (border-zinc-200). Sticky positioning, z-50.",
+    "buttons": "Square or rounded-sm. Solid black (bg-zinc-950 text-white) for primary, transparent with 1px black border for secondary. Hover: invert or subtle gray."
+  },
+  "component_instructions": {
+    "HypeBadge": "Use strict color coding from hype_scores palette. Sharp pill or square shape. Use IBM Plex Mono for the score number. Example: 'border border-red-500 bg-red-100 text-red-900 px-2 py-1 text-xs font-mono uppercase'",
+    "CheckThisInput": "Massive, terminal-like input. 2px solid black border, large padding (p-6 or p-8), large text (text-2xl). Must feel like a command line or prominent search bar.",
+    "NewsFeedItem": "Grid layout. Date/Time on left, Hype Badge in center or top right, Headline prominent, 2-line AI summary in text-secondary. Minimalist, high contrast.",
+    "StoryClusterView": "Side-by-side comparison. Use a multi-column grid where each column represents a different source's take on the same event, highlighting their distinct hype scores.",
+    "PredictionGraveyard": "Table or dense list format (Control Room density). Clear status badges: Pending (Gray/Blue), Proved True (Green), Proved False (Red).",
+    "DailyDigest": "Editorial layout. Like a high-end newsletter. Focus on typography, massive drop caps, single column reading experience."
+  },
+  "motion_and_interaction": {
+    "hover_states": "Hard cuts or very fast transitions (100ms). Change border colors to black, text colors to black. No bouncy scaling.",
+    "focus_states": "High contrast 2px outline with 2px offset (ring-2 ring-offset-2 ring-zinc-900).",
+    "page_transitions": "Minimalist fade in. No excessive parallax."
+  },
+  "icons_and_assets": {
+    "library": "lucide-react",
+    "style": "Stroke width 1.5 or 2, sharp, geometric."
+  },
+  "media": {
+    "hero_abstract": {
+      "url": "https://images.unsplash.com/photo-1752451399416-faef5f9fe572?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODR8MHwxfHNlYXJjaHw0fHxhaSUyMHRlY2hub2xvZ3klMjBhYnN0cmFjdHxlbnwwfHx8fDE3NzQ2MzYxODZ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Abstract technological spiral for background accents."
+    },
+    "article_image_1": {
+      "url": "https://images.unsplash.com/photo-1625314887424-9f190599bd56?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODd8MHwxfHNlYXJjaHwyfHxhcnRpZmljaWFsJTIwaW50ZWxsaWdlbmNlJTIwcm9ib3R8ZW58MHx8fHwxNzc0NjM2MTg3fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Black and white robot illustration for AI news placeholder."
+    },
+    "article_image_2": {
+      "url": "https://images.pexels.com/photos/5473956/pexels-photo-5473956.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Woman with binary code projection."
+    },
+    "tech_abstract_2": {
+      "url": "https://images.unsplash.com/photo-1752451399417-eb6e072269bb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODR8MHwxfHNlYXJjaHwzfHxhaSUyMHRlY2hub2xvZ3klMjBhYnN0cmFjdHxlbnwwfHx8fDE3NzQ2MzYxODZ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Luminous spiraling design."
+    }
+  },
+  "accessibility_and_testing": {
+    "testing_attributes": "All interactive and key informational elements MUST include a data-testid attribute. Use kebab-case, role-based names (e.g. data-testid='hype-filter-button', data-testid='check-url-input').",
+    "contrast": "Ensure all text meets minimum 4.5:1 ratio against backgrounds."
+  }
+}
