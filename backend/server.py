@@ -94,6 +94,7 @@ class Claim(BaseModel):
 
 class CheckUrlRequest(BaseModel):
     url: str
+    transcript: Optional[str] = None  # Optional: client can provide YouTube transcript
 
 class CheckUrlResponse(BaseModel):
     url: str
@@ -1110,19 +1111,27 @@ async def check_url(request: CheckUrlRequest):
     youtube_id = extract_youtube_id(url)
     
     if youtube_id:
-        # YouTube video
-        try:
-            text = await get_youtube_transcript(youtube_id)
-            if not text:
-                raise HTTPException(status_code=400, detail="Could not extract YouTube transcript. The video may not have captions or may be private.")
-        except Exception as e:
-            error_msg = str(e)
-            if "blocking" in error_msg.lower() or "cloud" in error_msg.lower():
-                raise HTTPException(
-                    status_code=503, 
-                    detail="YouTube is blocking transcript requests from cloud servers. This is a known limitation. Try analyzing an article URL instead."
-                )
-            raise HTTPException(status_code=400, detail=f"YouTube transcript error: {error_msg}")
+        # YouTube video - prefer client-provided transcript
+        if request.transcript and len(request.transcript) > 50:
+            text = request.transcript
+            logger.info(f"Using client-provided transcript for YouTube video {youtube_id}")
+        else:
+            # Try server-side extraction (may fail on cloud)
+            try:
+                text = await get_youtube_transcript(youtube_id)
+                if not text:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="NEED_CLIENT_TRANSCRIPT"
+                    )
+            except Exception as e:
+                error_msg = str(e)
+                if "blocking" in error_msg.lower() or "cloud" in error_msg.lower() or "NEED_CLIENT_TRANSCRIPT" in error_msg:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="NEED_CLIENT_TRANSCRIPT"
+                    )
+                raise HTTPException(status_code=400, detail=f"YouTube transcript error: {error_msg}")
         title = f"YouTube Video: {youtube_id}"
         source_type = "youtube"
     else:
