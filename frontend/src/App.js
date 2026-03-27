@@ -140,7 +140,7 @@ const Header = () => {
   );
 };
 
-// ============= YouTube Transcript Fetcher (Client-side via CORS proxy) =============
+// ============= YouTube URL Detector =============
 const extractYouTubeId = (url) => {
   const patterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
@@ -150,85 +150,6 @@ const extractYouTubeId = (url) => {
     const match = url.match(pattern);
     if (match) return match[1];
   }
-  return null;
-};
-
-const fetchYouTubeTranscript = async (videoId) => {
-  // Try multiple methods to get transcript
-  
-  // Method 1: Try using a CORS proxy
-  const corsProxies = [
-    `https://corsproxy.io/?url=`,
-    `https://api.allorigins.win/raw?url=`,
-  ];
-  
-  for (const proxyBase of corsProxies) {
-    try {
-      const youtubeUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
-      const response = await fetch(`${proxyBase}${youtubeUrl}`, {
-        headers: { 'Accept': 'text/html' }
-      });
-      
-      if (!response.ok) continue;
-      
-      const html = await response.text();
-      
-      // Extract captions URL from the page
-      const captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
-      if (!captionMatch) continue;
-      
-      let captions;
-      try {
-        captions = JSON.parse(captionMatch[1]);
-      } catch {
-        continue;
-      }
-      
-      if (!captions || captions.length === 0) continue;
-      
-      // Get the first available caption track (prefer English)
-      const englishTrack = captions.find(c => c.languageCode === 'en' || c.languageCode?.startsWith('en')) || captions[0];
-      const captionUrl = englishTrack.baseUrl;
-      
-      // Fetch the actual transcript through proxy
-      const transcriptResponse = await fetch(`${proxyBase}${encodeURIComponent(captionUrl)}`);
-      if (!transcriptResponse.ok) continue;
-      
-      const transcriptXml = await transcriptResponse.text();
-      
-      // Parse XML transcript
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(transcriptXml, "text/xml");
-      const textNodes = xmlDoc.getElementsByTagName("text");
-      
-      if (textNodes.length === 0) continue;
-      
-      const transcriptParts = [];
-      for (let i = 0; i < textNodes.length; i++) {
-        let text = textNodes[i].textContent || '';
-        // Decode HTML entities
-        text = text
-          .replace(/&#39;/g, "'")
-          .replace(/&quot;/g, '"')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/\\n/g, ' ')
-          .trim();
-        if (text) transcriptParts.push(text);
-      }
-      
-      if (transcriptParts.length > 0) {
-        console.log(`Successfully fetched transcript via ${proxyBase}`);
-        return transcriptParts.join(' ');
-      }
-    } catch (error) {
-      console.log(`Proxy ${proxyBase} failed:`, error.message);
-      continue;
-    }
-  }
-  
-  console.log("All transcript fetch methods failed");
   return null;
 };
 
@@ -250,23 +171,13 @@ const CheckThis = () => {
     setLoadingStatus("Analyzing...");
 
     try {
-      let transcript = null;
       const youtubeId = extractYouTubeId(url);
-      
-      // If YouTube URL, try to fetch transcript client-side first
       if (youtubeId) {
         setLoadingStatus("Fetching YouTube transcript...");
-        transcript = await fetchYouTubeTranscript(youtubeId);
-        if (transcript) {
-          setLoadingStatus("Analyzing content...");
-        }
       }
-      
-      // Send to backend for analysis
-      const response = await axios.post(`${API}/check-url`, { 
-        url, 
-        transcript: transcript || undefined 
-      });
+
+      // Send to backend for analysis — backend handles transcript fetching server-side
+      const response = await axios.post(`${API}/check-url`, { url });
       
       setResult(response.data);
       toast.success("Analysis complete!");
